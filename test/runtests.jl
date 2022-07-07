@@ -1,6 +1,7 @@
-using GinzburgLandau
+using GinzburgLandau, OrdinaryDiffEq, StatsBase
 using Test
 
 @testset "GinzburgLandau.jl" begin
-    # Write your tests here.
+    include("finite_differences.jl")
+    #include("pseudo_spectral.jl")
 end

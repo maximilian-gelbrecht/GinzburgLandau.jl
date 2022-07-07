@@ -1,5 +1,7 @@
 module GinzburgLandau
 
-# Write your package code here.
+include("ginzburg.jl")
+include("finite_differences.jl")
+#include("pseudo_spectral.jl")
 
 end
