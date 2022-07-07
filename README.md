@@ -35,7 +35,7 @@ anim = @animate for t in ts
     heatmap(reshape(abs.(sol(t)), g), clim=(0.,1.5))
 end
 
-gif(anim, "clge2d.gif")
+gif(anim, "cgle2d.gif")
 ```
 
 ![cgle2d.gif](cgle2d.gif)
