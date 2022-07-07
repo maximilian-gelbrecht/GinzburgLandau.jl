@@ -38,4 +38,4 @@ end
 gif(anim, "clge2d.gif")
 ```
 
-![Gif](cgle2d.gif)
+![cgle2d.gif](cgle2d.gif)
