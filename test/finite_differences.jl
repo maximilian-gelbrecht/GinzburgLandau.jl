@@ -16,5 +16,5 @@ sol = solve(prob, Tsit5())
 sol_array = Array(sol(50.:1:200.))
 
 # test that mean and variance stays rougly constant after some transient
-@test sum(0.75 .< mean(abs.(sol_array), dims=1)[:] .< 0.85) == size(sol_array,2)
+@test sum(0.7 .< mean(abs.(sol_array), dims=1)[:] .< 0.9) == size(sol_array,2)
 @test sum(0.045 .< var(abs.(sol_array), dims=1)[:] .< 0.075) == size(sol_array,2)

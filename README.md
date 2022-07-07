@@ -14,8 +14,8 @@ The implementation models the phase state as a 1D flattened array that can be re
 ```julia 
 using GinzburgLandau, OrdinaryDiffEq, Plots
 
-n = 128
-L = 192
+n = 128 # number of grid points per side
+L = 192 # domain size of each side
 
 α = 2.0
 β = -1.0
@@ -32,8 +32,10 @@ sol = solve(prob, Tsit5())
 
 ts = tspan[1]:0.25:tspan[2]
 anim = @animate for t in ts
-    heatmap(reshape(abs.(sol(t)),g), clim=(0.,1.5))
+    heatmap(reshape(abs.(sol(t)), g), clim=(0.,1.5))
 end
 
 gif(anim, "clge2d.gif")
 ```
+
+![Gif]("cgle2d.gif")
