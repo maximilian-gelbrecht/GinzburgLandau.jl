@@ -7,9 +7,10 @@ Two-Dimensional discretization of the Complex Ginzburg Landau Equation $\partial
 
 ## Usage 
 
+### Finite Differences 
+
 The implementation models the phase state as a 1D flattened array that can be reshaped easily into a 2D array on the grid. 
 
-### Finite Differences 
 
 ```julia 
 using GinzburgLandau, OrdinaryDiffEq, Plots
@@ -23,10 +24,10 @@ L = 192 # domain size of each side
 g = GinzburgLandau.GridFD(range(0,L,length=n),range(0,L,length=n))
 Δ = GinzburgLandau.Laplacian2DPeriodic(g)
 u0 = GinzburgLandau.initial_conditions(g)
-p = [α, β]
+p = [α, β, Δ]
 tspan = (0.,200.)
 
-prob = ODEProblem(GinzburgLandau.cgle_fd!, u0, tspan, [α, β, Δ])
+prob = ODEProblem(GinzburgLandau.cgle_fd!, u0, tspan, p)
 
 sol = solve(prob, Tsit5())
 
@@ -39,3 +40,39 @@ gif(anim, "cgle2d.gif")
 ```
 
 ![cgle2d.gif](cgle2d.gif)
+
+
+## Pseudospectral 
+
+Here, the phase state is actually 2D all the time:
+
+```julia
+using OrdinaryDiffEq, GinzburgLandau, StatsBase, Plots,FFTW 
+
+n = 36
+L = 75
+α = 2.0
+β = -1.0
+
+g = GinzburgLandau.GridSP(range(0,L,length=n),range(0,L,length=n))
+p = GinzburgLandau.CGLESPeudoSpectralPars(g, α, β)
+u0 = p.FT * GinzburgLandau.initial_conditions(g)
+tspan = (0.,200.)
+
+prob = ODEProblem(GinzburgLandau.cgle_ps!, u0, tspan, p)
+sol = solve(prob, Tsit5())
+sol_array = Array(sol(0.:0.5:200.))
+
+# transform back 
+sol_real = similar(sol_array)
+for i ∈ 1:size(sol_array,3)
+    sol_real[:,:,i] = p.iFT * sol_array[:,:,i]
+end
+
+# plot
+anim = @animate for i ∈ 1:size(sol_real, 3)
+    heatmap(abs.(sol_real[:,:,i]), clim=(0.,1.5))
+end
+
+gif(anim, "cgle2d-ps.gif")
+```

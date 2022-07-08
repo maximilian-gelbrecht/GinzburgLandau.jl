@@ -6,7 +6,6 @@ L = 75
 g = GinzburgLandau.GridFD(range(0,L,length=n),range(0,L,length=n))
 Δ = GinzburgLandau.Laplacian2DPeriodic(g)
 u0 = GinzburgLandau.initial_conditions(g)
-p = [α, β]
 tspan = (0.,200.)
 
 prob = ODEProblem(GinzburgLandau.cgle_fd!, u0, tspan, [α, β, Δ])

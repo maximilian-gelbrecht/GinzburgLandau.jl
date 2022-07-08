@@ -1,106 +1,105 @@
-begin
-    using FFTW
-    using Plots
-    using OrdinaryDiffEq
+using AbstractFFTs 
+
+"""
+    GridSP
+
+2D dicretization grid for the pseudo spectral approach
+
+# Initializiation 
+
+    GridFD(x::AbstractRange, y::AbstractRange)
+
+# Fields
+
+* `x` x coordinate, a ``n``-long range
+* `y` y coordinate, a ``n``-long range
+* `h` grid spacing 
+* `n` number of grid points along one side
+* `N` total number of grid points 
+* `k` wavenumber 
+* `k²` squared wavenumber 
+* `k²_x_grid` meshgrid for `k_x`, this is a ``n\times n`` matrix 
+* `k²_y_grid` meshgrid for `k_y`
+"""
+struct GridSP <: AbstractGrid
+    x # this is a n_x long range
+    y
+    h # spacing 
+    n # number of grid points along one side
+    N # total number of grid points 
+    k # wave number 
+    k²
+    k²_x_grid 
+    k²_y_grid
+end 
+
+function GridSP(x::AbstractRange, y::AbstractRange)
+    h_x = abs(x[2] - x[1])
+    h_y = abs(y[2] - y[1])
+    n_x = length(x)
+    n_y = length(y)
+    @assert n_x == n_y
+    @assert h_x == h_y 
+
+    N = n_x * n_y 
+
+    L = abs(x[end] - x[1])
+
+    @assert iseven(n_x)
+    n2 = Int(n_x/2)
+    k = [0:n2-1; 0; -n2+1:-1] .*(2π/L);
+    k² = k.*k
+    k²[n2 + 1] = (n2*(2π/L))^2
+
+    k²_x_grid = ones(n_x) *  k²'
+    k²_y_grid = k² * ones(n_y)'
+    
+    GridSP(x, y, h_x, n_x, N, k, k², k²_x_grid, k²_y_grid)
 end
 
-begin
-    # simple meshgrid to get the coordinate axes both in real and spectral space
-    function meshgrid(x::AbstractArray{T,1}) where T<:Number
-        N = length(x)
-        x1 = zeros(T, (N,N))
-        y1 = zeros(T, (N,N))
+initial_conditions(g::GridSP) = initial_conditions(g.n)
 
-        for i=1:N
-            x1[i,:] = x
-        end
-        y1 = collect(x1')
+"""
+    CGLESPeudoSpectralPars{T,S,U,V}
 
-        return x1,y1
-    end
+Parameter struct for Pseudospectral approach
 
-    struct CGLE2d_Pars{T,S,U,V}
-        LinOp::AbstractArray{T,2} # Linear Differential Operator
-        β::S
-        FT::U # Fourier Transform Operator
-        iFT::V # Inverse Fourier Transform Operator
-    end
+    CGLESPeudoSpectralPars(g::GridSP, α, β) 
 
-    function CGLE2d_Pars(n::Int, L::Int, α::T, β::T, u₀::AbstractArray{T,2}) where T<:Number
-        @assert iseven(n)
-        n2 = Int(n/2)
+# Fields 
 
-        # the grid in spectral domain
-        k = [0:n2-1; 0; -n2+1:-1] .*(2π/L);
-        k² = k.*k
-        k²[n2 + 1] = (n2*(2π/L))^2
-        kx², ky² = meshgrid(k²)
-        ksum = kx² .+ ky²
-
-        # the linear operator
-        LinFac = 1.0 .- (ksum .* (1.0 .+ α))
-
-        FT = FFTW.plan_fft(u₀)
-        iFT = FFTW.plan_ifft(FT*u₀)
-
-        CGLE2d_Pars(LinFac, β, FT, iFT)
-    end
+* `LinOp::AbstractArray{T,2}` Linear Differential Operator
+* `α::S`
+* `β::S`
+* `FT::U` Fourier Transform Operator
+* `iFT::V` Inverse Fourier Transform Operator
+"""
+struct CGLESPeudoSpectralPars{T,S,U,V}
+    LinOp::AbstractArray{T,2} # Linear Differential Operator
+    α::S
+    β::S
+    FT::U # Fourier Transform Operator
+    iFT::V # Inverse Fourier Transform Operator
 end
 
-begin
-    n = 36
-    L = 75
-    α = 2.0im
-    β = -1.0im
-    #u0 = 0.1*(rand(ComplexF64, (n,n)) .- 0.5)
-    dx = n/L
-    x,y = meshgrid(range(-L/2, stop=L/2, length=n))
-    u₀ = 0.01*(rand(ComplexF64, (n,n)) .- 0.5)
-    pars = CGLE2d_Pars(n, L, α, β, u₀)
-    Fu₀ = pars.FT*u₀
+function CGLESPeudoSpectralPars(g::GridSP, α, β) 
+        
+    ksum = g.k²_x_grid .+ g.k²_y_grid
 
-    non_lin(x, β) = x - (1 + β)*abs(x)^2*x
+    # the linear operator
+    LinOp = 1.0 .- (ksum .* complex(1.0,α))
+
+    u₀ = initial_conditions(g)
+
+    FT = plan_fft(u₀)
+    iFT = plan_ifft(FT*u₀)
+
+    CGLESPeudoSpectralPars(LinOp, α,  β, FT, iFT)
 end
 
-# finite difference version
-function cgle_fd!(du, u, p, t)
-    α, β = p
-    du .= (1 .+ α)*lap*u + non_lin.(u, β)
-end
+function cgle_ps!(du, u, p, t)
+    LinOp, α, β, FT, iFT = p.LinOp, p.α, p.β, p.FT, p.iFT
+    invu = iFT*u
+    du .= LinOp.*u .- FT*(complex(1.0,p.β) .* (abs.(invu)).^2 .* invu)
+end 
 
-# pseudo-spectral
-function cgle!(du, u, p, t)
-    invu = p.iFT*u
-    du .= p.LinOp.*u .- p.FT*( (1.0 .+p.β) .* (abs.(invu)).^2 .* invu)
-end
-
-t_end = 100. # short integration time for initial experiment (the animation is pretty slow to render)
-prob = ODEProblem(cgle!, Fu₀, (0.,t_end), pars)
-t_start = 50. #throw away transient
-
-println("solving....")
-if LOAD_DATA
-    @load "ginsburg-data.jld2" dat
-else
-    @time u = solve(prob, Tsit5())
-    #throw away transient
-    t = t_start:0.1:t_end
-    dat = zeros(eltype(u₀), n, n, length(t))
-    for it=1:length(t)
-        dat[:,:,it] = pars.iFT*u(t[it])
-    end
-    if SAVE_DATA
-        @save "ginsburg-data.jld2" dat
-    end
-end
-
-N_t = length(50.:0.1:t_end)
-
-if PLOT
-    Plots.pyplot()
-    anim = Plots.@animate for i in eachindex(t)
-        Plots.heatmap(abs.(dat[:,:,i]), clim=(-1.5,1.5))
-    end
-
-    gif(anim, "clge2d-small-25.gif")
-end
