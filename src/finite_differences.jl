@@ -80,6 +80,13 @@ function Laplacian2DPeriodic(g::GridFD)
     sparse(M./(g.h^2))
 end
 
+"""
+    Laplacian2DPeriodic(n::Integer, L)
+
+Returns 2d finite diffence laplace operator for a domain of side length `L` and `n` grid points as a sparse matrix. Periodic boundary condtions are applied
+"""
+Laplacian2DPeriodic(n::Integer, L) = Laplacian2DPeriodic(GridFD(range(0, L, length=n), range(0, L, length=n)))
+
 function cgle_fd!(du, u, p, t)
     α, β, Δ = p
     du .= complex(1,α).*(Δ*u) .+ reaction(u, β)
